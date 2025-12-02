@@ -11,6 +11,7 @@ import SignatureScreen from "../screens/SignatureScreen";
 // Define types for stack and tabs
 export type RootStackParamList = {
   MainTabs: undefined;
+  Invoice: undefined;
   Signature: undefined;
 };
 
@@ -103,6 +104,11 @@ export default function AppNavigator() {
           name="MainTabs"
           component={TabNavigator}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Invoice"
+          component={InvoiceScreen}
+          options={{ title: "Create Invoice" }}
         />
         <Stack.Screen
           name="Signature"
