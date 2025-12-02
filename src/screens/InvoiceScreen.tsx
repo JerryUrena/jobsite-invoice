@@ -161,7 +161,7 @@ export default function InvoiceScreen({ navigation }: Props) {
           
           <TouchableOpacity 
             style={[styles.actionButton, styles.backButton]}
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => navigation.navigate("MainTabs")}
           >
             <Text style={styles.backButtonText}>Back to Menu</Text>
           </TouchableOpacity>
