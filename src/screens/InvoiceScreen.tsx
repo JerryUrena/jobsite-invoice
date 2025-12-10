@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { 
   View, 
   Text, 
@@ -11,6 +12,8 @@ import {
   Alert 
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import { getTaxRate } from "./SettingsScreen";
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -28,16 +31,27 @@ interface LineItem {
 }
 
 export default function InvoiceScreen({ navigation }: Props) {
-  const [items, setItems] = useState<LineItem[]>([
-    { id: "1", name: "Labor", qty: 2, rate: 75 },
-    { id: "2", name: "Materials", qty: 1, rate: 120 },
-  ]);
+  const [items, setItems] = useState<LineItem[]>([]);
   
   const [newItem, setNewItem] = useState({
     name: "",
     qty: "",
     rate: ""
   });
+  
+  const [taxRate, setTaxRate] = useState(8.0);
+  const [savedInvoice, setSavedInvoice] = useState<any>(null);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadTaxRate = async () => {
+        const rate = await getTaxRate();
+        setTaxRate(rate);
+      };
+      loadTaxRate();
+    }, [])
+  );
 
   const addItem = () => {
     if (!newItem.name.trim() || !newItem.qty || !newItem.rate) {
@@ -60,8 +74,54 @@ export default function InvoiceScreen({ navigation }: Props) {
     setItems(items.filter(item => item.id !== id));
   };
 
+  const INVOICES_KEY = "@jobsite_invoices";
+
+  const saveInvoice = async (status = 'Draft') => {
+    const invoice = {
+      id: Date.now().toString(),
+      items,
+      subtotal,
+      tax,
+      taxRate,
+      total,
+      createdAt: new Date().toLocaleDateString(),
+      status
+    };
+    setSavedInvoice(invoice);
+    setIsSaved(true);
+    try {
+      const existing = await AsyncStorage.getItem(INVOICES_KEY);
+      let invoices = [];
+      if (existing) {
+        invoices = JSON.parse(existing);
+      }
+      invoices.unshift(invoice); 
+      await AsyncStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+    } catch (err) {
+      // handle error silently
+    }
+
+    setItems([]);
+    setNewItem({ name: "", qty: "", rate: "" });
+    return invoice;
+  };
+
+  const handleEmailInvoice = async () => {
+    const invoice = await saveInvoice('Open');
+    Alert.alert(
+      "Invoice Saved", 
+      `Invoice #${invoice.id} has been saved successfully! Email functionality will be implemented soon.`,
+      [{ text: "OK" }]
+    );
+  };
+
+  const handleSignAndSave = async () => {
+    await saveInvoice('Accepted');
+    navigation.navigate("Signature");
+  };
+
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0);
-  const tax = subtotal * 0.08; // 8% tax
+  const tax = subtotal * (taxRate / 100);
   const total = subtotal + tax;
 
   const renderItem = ({ item }: { item: LineItem }) => (
@@ -74,8 +134,7 @@ export default function InvoiceScreen({ navigation }: Props) {
       </View>
       <TouchableOpacity 
         style={styles.removeButton} 
-        onPress={() => removeItem(item.id)}
-      >
+        onPress={() => removeItem(item.id)}>
         <Text style={styles.removeText}>×</Text>
       </TouchableOpacity>
     </View>
@@ -86,7 +145,6 @@ export default function InvoiceScreen({ navigation }: Props) {
       <View style={styles.content}>
         <Text style={styles.title}>Create Invoice</Text>
 
-        {/* Add New Item Section */}
         <View style={styles.addSection}>
           <Text style={styles.sectionTitle}>Add Line Item</Text>
           
@@ -94,8 +152,7 @@ export default function InvoiceScreen({ navigation }: Props) {
             style={styles.input}
             placeholder="Item name (e.g., Labor, Materials)"
             value={newItem.name}
-            onChangeText={(text) => setNewItem({...newItem, name: text})}
-          />
+            onChangeText={(text) => setNewItem({...newItem, name: text})}/>
           
           <View style={styles.row}>
             <TextInput
@@ -103,15 +160,13 @@ export default function InvoiceScreen({ navigation }: Props) {
               placeholder="Quantity"
               value={newItem.qty}
               onChangeText={(text) => setNewItem({...newItem, qty: text})}
-              keyboardType="numeric"
-            />
+              keyboardType="numeric"/>
             <TextInput
               style={[styles.input, styles.halfInput]}
               placeholder="Rate ($)"
               value={newItem.rate}
               onChangeText={(text) => setNewItem({...newItem, rate: text})}
-              keyboardType="numeric"
-            />
+              keyboardType="numeric"/>
           </View>
           
           <TouchableOpacity style={styles.addButton} onPress={addItem}>
@@ -119,7 +174,6 @@ export default function InvoiceScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Items List */}
         <View style={styles.itemsSection}>
           <Text style={styles.sectionTitle}>Invoice Items</Text>
           {items.length === 0 ? (
@@ -129,41 +183,52 @@ export default function InvoiceScreen({ navigation }: Props) {
               data={items}
               keyExtractor={(i) => i.id}
               renderItem={renderItem}
-              scrollEnabled={false}
-            />
+              scrollEnabled={false}/>
           )}
         </View>
 
-        {/* Totals Section */}
+        {isSaved && savedInvoice && (
+          <View style={styles.savedSection}>
+            <Text style={styles.savedTitle}>Invoice Saved</Text>
+            <View style={styles.savedInfo}>
+              <Text style={styles.savedLabel}>Invoice ID: <Text style={styles.savedValue}>#{savedInvoice.id}</Text></Text>
+              <Text style={styles.savedLabel}>Date: <Text style={styles.savedValue}>{savedInvoice.createdAt}</Text></Text>
+              <Text style={styles.savedLabel}>Status: <Text style={[styles.savedValue, styles.statusDraft]}>{savedInvoice.status}</Text></Text>
+              <Text style={styles.savedLabel}>Total: <Text style={styles.savedValue}>${savedInvoice.total.toFixed(2)}</Text></Text>
+            </View>
+          </View>
+        )}
+
         <View style={styles.totalsSection}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal:</Text>
             <Text style={styles.totalValue}>${subtotal.toFixed(2)}</Text>
           </View>
+
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tax (8%):</Text>
+            <Text style={styles.totalLabel}>Tax ({taxRate}%):</Text>
             <Text style={styles.totalValue}>${tax.toFixed(2)}</Text>
           </View>
+
           <View style={[styles.totalRow, styles.finalTotal]}>
             <Text style={styles.finalTotalLabel}>Total:</Text>
             <Text style={styles.finalTotalValue}>${total.toFixed(2)}</Text>
           </View>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.buttons}>
           <TouchableOpacity 
-            style={[styles.actionButton, styles.signButton]}
-            onPress={() => navigation.navigate("Signature")}
-          >
-            <Text style={styles.signButtonText}>Sign Invoice</Text>
+            style={[styles.actionButton, styles.emailButton]}
+            onPress={handleEmailInvoice}
+            disabled={items.length === 0}>
+            <Text style={styles.emailButtonText}>Email Invoice</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.actionButton, styles.backButton]}
-            onPress={() => navigation.navigate("MainTabs")}
-          >
-            <Text style={styles.backButtonText}>Back to Menu</Text>
+            style={[styles.actionButton, styles.signButton]}
+            onPress={handleSignAndSave}
+            disabled={items.length === 0}>
+            <Text style={styles.signButtonText}>Sign & Save</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -353,5 +418,42 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  savedSection: {
+    backgroundColor: "#f0f9ff",
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: "#34C759",
+  },
+  savedTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#34C759",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  savedInfo: {
+    gap: 8,
+  },
+  savedLabel: {
+    fontSize: 14,
+    color: "#666",
+  },
+  savedValue: {
+    fontWeight: "600",
+    color: "#333",
+  },
+  statusDraft: {
+    color: "#FF9500",
+  },
+  emailButton: {
+    backgroundColor: "#007AFF",
+  },
+  emailButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });

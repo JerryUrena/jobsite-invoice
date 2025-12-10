@@ -7,12 +7,15 @@ import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import HomeScreen from "../screens/HomeScreen";
 import InvoiceScreen from "../screens/InvoiceScreen";
 import SignatureScreen from "../screens/SignatureScreen";
+import SettingsScreen from "../screens/SettingsScreen";
+import InvoiceListScreen from "../screens/InvoiceListScreen";
+import InvoiceViewScreen from "../screens/InvoiceViewScreen";
 
-// Define types for stack and tabs
 export type RootStackParamList = {
   MainTabs: undefined;
   Invoice: undefined;
   Signature: undefined;
+  InvoiceView: { invoice: any };
 };
 
 export type TabParamList = {
@@ -36,8 +39,8 @@ function TabNavigator() {
           height: 80,
           position: "absolute",
           overflow: "hidden",
-          elevation: 0, // Remove shadow on Android
-          shadowOpacity: 0, // Remove shadow on iOS
+          elevation: 0, 
+          shadowOpacity: 0, 
         },
         tabBarActiveTintColor: "#fff",
         tabBarInactiveTintColor: "rgba(255,255,255,0.6)",
@@ -46,8 +49,8 @@ function TabNavigator() {
           fontWeight: "600",
           marginBottom: 8,
         },
-      }}
-    >
+      }}>
+
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -60,12 +63,11 @@ function TabNavigator() {
             size: number;
             focused: boolean;
           }) => <Ionicons name="home-outline" size={size} color={color} />,
-        }}
-      />
+        }}/>
 
       <Tab.Screen
         name="Invoices"
-        component={InvoiceScreen}
+        component={InvoiceListScreen}
         options={{
           tabBarIcon: ({
             color,
@@ -75,12 +77,11 @@ function TabNavigator() {
             size: number;
             focused: boolean;
           }) => <MaterialIcons name="request-quote" size={size} color={color} />,
-        }}
-      />
+        }}/>
 
       <Tab.Screen
         name="Settings"
-        component={HomeScreen}
+        component={SettingsScreen}
         options={{
           tabBarIcon: ({
             color,
@@ -90,8 +91,7 @@ function TabNavigator() {
             size: number;
             focused: boolean;
           }) => <FontAwesome5 name="cog" size={size} color={color} />,
-        }}
-      />
+        }}/>
     </Tab.Navigator>
   );
 }
@@ -103,18 +103,19 @@ export default function AppNavigator() {
         <Stack.Screen
           name="MainTabs"
           component={TabNavigator}
-          options={{ headerShown: false }}
-        />
+          options={{ headerShown: false }}/>
         <Stack.Screen
           name="Invoice"
           component={InvoiceScreen}
-          options={{ title: "Create Invoice" }}
-        />
+          options={{ title: "Create Invoice" }}/>
         <Stack.Screen
           name="Signature"
           component={SignatureScreen}
-          options={{ title: "Sign Invoice" }}
-        />
+          options={{ title: "Sign Invoice" }}/>
+        <Stack.Screen
+          name="InvoiceView"
+          component={InvoiceViewScreen}
+          options={{ title: "Invoice Details" }}/>
       </Stack.Navigator>
     </NavigationContainer>
   );
