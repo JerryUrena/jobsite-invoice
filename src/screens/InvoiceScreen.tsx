@@ -14,6 +14,7 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { getTaxRate } from "./SettingsScreen";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -41,6 +42,8 @@ export default function InvoiceScreen({ navigation }: Props) {
   
   const [taxRate, setTaxRate] = useState(8.0);
   const [savedInvoice, setSavedInvoice] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Loading...");
   const [isSaved, setIsSaved] = useState(false);
 
   useFocusEffect(
@@ -50,14 +53,29 @@ export default function InvoiceScreen({ navigation }: Props) {
         setTaxRate(rate);
       };
       loadTaxRate();
+
+      // Clear saved state when screen gains focus
+      return () => {
+        setIsSaved(false);
+        setSavedInvoice(null);
+      };
     }, [])
   );
 
-  const addItem = () => {
+  const addItem = async () => {
+    if (isSaved) {
+      setIsSaved(false);
+      setSavedInvoice(null);
+    }
+
     if (!newItem.name.trim() || !newItem.qty || !newItem.rate) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
+
+    setIsLoading(true);
+    setLoadingMessage("Adding Item...");
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const item: LineItem = {
       id: Date.now().toString(),
@@ -68,6 +86,7 @@ export default function InvoiceScreen({ navigation }: Props) {
 
     setItems([...items, item]);
     setNewItem({ name: "", qty: "", rate: "" });
+    setIsLoading(false);
   };
 
   const removeItem = (id: string) => {
@@ -103,21 +122,37 @@ export default function InvoiceScreen({ navigation }: Props) {
 
     setItems([]);
     setNewItem({ name: "", qty: "", rate: "" });
+    setLoadingMessage("Saving Invoice...");
     return invoice;
   };
 
   const handleEmailInvoice = async () => {
-    const invoice = await saveInvoice('Open');
-    Alert.alert(
-      "Invoice Saved", 
-      `Invoice #${invoice.id} has been saved successfully! Email functionality will be implemented soon.`,
-      [{ text: "OK" }]
-    );
+    setIsLoading(true);
+    try {
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const invoice = await saveInvoice('Open');
+      Alert.alert(
+        "Invoice Saved", 
+        `Invoice #${invoice.id} has been saved successfully! Email functionality will be implemented soon.`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignAndSave = async () => {
-    await saveInvoice('Accepted');
-    navigation.navigate("Signature");
+    setLoadingMessage("Saving Invoice...");
+    setIsLoading(true);
+    try {
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await saveInvoice('Accepted');
+      navigation.navigate("Signature");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0);
@@ -142,6 +177,7 @@ export default function InvoiceScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container}>
+      <LoadingOverlay visible={isLoading} message={loadingMessage} />
       <View style={styles.content}>
         <Text style={styles.title}>Create Invoice</Text>
 

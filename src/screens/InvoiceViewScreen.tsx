@@ -41,7 +41,7 @@ export default function InvoiceViewScreen({ route, navigation }: any) {
     html += `</ul>`;
     await Print.printAsync({ html });
   };
-  
+
   const handleDelete = async () => {
     Alert.alert(
       "Delete Invoice",
@@ -73,8 +73,7 @@ export default function InvoiceViewScreen({ route, navigation }: any) {
         <Text style={styles.label}>Status: </Text>
         <TouchableOpacity
           style={[styles.statusButton, invoice.status === 'Accepted' ? styles.accepted : styles.notAccepted]}
-          onPress={toggleStatus}
-        >
+          onPress={toggleStatus}>
           <Text style={styles.statusButtonText}>{invoice.status}</Text>
         </TouchableOpacity>
       </View>

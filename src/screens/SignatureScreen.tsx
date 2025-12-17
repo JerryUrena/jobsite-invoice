@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import SignaturePad from "../components/Signature";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -21,6 +23,16 @@ type Props = NativeStackScreenProps<RootStackParamList, "Signature">;
 export default function SignatureScreen({ navigation }: Props) {
   const [hasSignature, setHasSignature] = useState(false);
   const [signatureData, setSignatureData] = useState<string>("");
+  const [resetKey, setResetKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setResetKey(prev => prev + 1);
+      setHasSignature(false);
+      setSignatureData("");
+    }, [])
+  );
 
   const handleSignature = (data: string) => {
     setSignatureData(data);
@@ -32,11 +44,16 @@ export default function SignatureScreen({ navigation }: Props) {
     setSignatureData("");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!hasSignature) {
       Alert.alert("No Signature", "Please add your signature before saving.");
       return;
     }
+
+    setIsLoading(true);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsLoading(false);
 
     Alert.alert(
       "Signature Saved",
@@ -71,6 +88,7 @@ export default function SignatureScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingOverlay visible={isLoading} message="Saving Signature..." />
       <View style={styles.header}>
         <Text style={styles.title}>Sign Invoice</Text>
         <Text style={styles.subtitle}>
@@ -80,6 +98,7 @@ export default function SignatureScreen({ navigation }: Props) {
 
       <View style={styles.signatureContainer}>
         <SignaturePad
+          key={resetKey}
           onOK={handleSignature}
           onClear={handleClear}
           hasSignature={hasSignature}/>
