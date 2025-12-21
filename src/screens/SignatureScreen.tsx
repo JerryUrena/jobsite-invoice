@@ -7,6 +7,7 @@ import {
   Alert,
   SafeAreaView, 
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import SignaturePad from "../components/Signature";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
@@ -52,7 +53,22 @@ export default function SignatureScreen({ navigation }: Props) {
 
     setIsLoading(true);
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Save signature to the most recent invoice
+      const key = "@jobsite_invoices";
+      const data = await AsyncStorage.getItem(key);
+      if (data) {
+        const invoices = JSON.parse(data);
+        if (invoices.length > 0) {
+          invoices[0].signature = signatureData;
+          await AsyncStorage.setItem(key, JSON.stringify(invoices));
+        }
+      }
+    } catch (err) {
+      // handle error silently
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
     setIsLoading(false);
 
     Alert.alert(

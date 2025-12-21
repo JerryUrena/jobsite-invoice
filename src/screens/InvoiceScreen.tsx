@@ -9,12 +9,14 @@ import {
   TextInput, 
   TouchableOpacity, 
   ScrollView,
-  Alert 
+  Alert,
+  Image 
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { getTaxRate } from "./SettingsScreen";
 import LoadingOverlay from "../components/LoadingOverlay";
+import * as ImagePicker from "expo-image-picker";
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -33,6 +35,7 @@ interface LineItem {
 
 export default function InvoiceScreen({ navigation }: Props) {
   const [items, setItems] = useState<LineItem[]>([]);
+  const [photos, setPhotos] = useState<string[]>([]);
   
   const [newItem, setNewItem] = useState({
     name: "",
@@ -89,6 +92,42 @@ export default function InvoiceScreen({ navigation }: Props) {
     setIsLoading(false);
   };
 
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera permission is needed to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotos([...photos, result.assets[0].uri]);
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPhotos([...photos, result.assets[0].uri]);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
+
   const removeItem = (id: string) => {
     setItems(items.filter(item => item.id !== id));
   };
@@ -99,6 +138,7 @@ export default function InvoiceScreen({ navigation }: Props) {
     const invoice = {
       id: Date.now().toString(),
       items,
+      photos,
       subtotal,
       tax,
       taxRate,
@@ -121,6 +161,7 @@ export default function InvoiceScreen({ navigation }: Props) {
     }
 
     setItems([]);
+    setPhotos([]);
     setNewItem({ name: "", qty: "", rate: "" });
     setLoadingMessage("Saving Invoice...");
     return invoice;
@@ -208,6 +249,33 @@ export default function InvoiceScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.addButton} onPress={addItem}>
             <Text style={styles.addButtonText}>Add Item</Text>
           </TouchableOpacity>
+
+          <View style={styles.photoButtonsRow}>
+            <TouchableOpacity style={styles.cameraButton} onPress={takePhoto}>
+              <Text style={styles.cameraButtonText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.galleryButton} onPress={pickImage}>
+              <Text style={styles.galleryButtonText}>Gallery</Text>
+            </TouchableOpacity>
+          </View>
+
+          {photos.length > 0 && (
+            <View style={styles.photosContainer}>
+              <Text style={styles.photosTitle}>Photos ({photos.length})</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {photos.map((uri, index) => (
+                  <View key={index} style={styles.photoWrapper}>
+                    <Image source={{ uri }} style={styles.photoThumbnail} />
+                    <TouchableOpacity
+                      style={styles.removePhotoButton}
+                      onPress={() => removePhoto(index)}>
+                      <Text style={styles.removePhotoText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         <View style={styles.itemsSection}>
@@ -331,6 +399,69 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  photoButtonsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  cameraButton: {
+    flex: 1,
+    backgroundColor: "#34C759",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cameraButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  galleryButton: {
+    flex: 1,
+    backgroundColor: "#FF9500",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  galleryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  photosContainer: {
+    marginTop: 16,
+  },
+  photosTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 8,
+  },
+  photoWrapper: {
+    position: "relative",
+    marginRight: 10,
+  },
+  photoThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removePhotoButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "#FF3B30",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removePhotoText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   itemsSection: {
     backgroundColor: "white",

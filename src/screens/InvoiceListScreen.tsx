@@ -44,7 +44,12 @@ export default function InvoiceListScreen({ navigation }: any) {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate("InvoiceView", { invoice: item })}>
-      <Text style={styles.id}>Invoice #{item.id}</Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.id}>Invoice #{item.id}</Text>
+        <View style={[styles.paidBadge, item.paid ? styles.paidYes : styles.paidNo]}>
+          <Text style={styles.paidBadgeText}>{item.paid ? 'Paid' : 'Unpaid'}</Text>
+        </View>
+      </View>
       <Text style={styles.date}>Date: {item.createdAt}</Text>
       <Text style={styles.status}>Status: {item.status}</Text>
       <Text style={styles.total}>Total: ${item.total?.toFixed(2)}</Text>
@@ -89,11 +94,32 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  paidBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  paidYes: {
+    backgroundColor: '#34C759',
+  },
+  paidNo: {
+    backgroundColor: '#8E8E93',
+  },
+  paidBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   id: {
     fontWeight: 'bold',
     fontSize: 16,
     color: '#007AFF',
-    marginBottom: 4,
   },
   date: {
     fontSize: 14,

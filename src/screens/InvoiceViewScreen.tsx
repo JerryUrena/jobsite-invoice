@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Switch } from "react-native";
 import * as Print from "expo-print";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -25,20 +25,101 @@ export default function InvoiceViewScreen({ route, navigation }: any) {
     } catch {}
   };
 
-  const handlePrint = async () => {
-    let html = `<h2>Invoice #${invoice.id}</h2>
-      <p><b>Date:</b> ${invoice.createdAt}</p>
-      <p><b>Status:</b> ${invoice.status}</p>
-      <p><b>Tax Rate:</b> ${invoice.taxRate}%</p>
-      <p><b>Subtotal:</b> $${invoice.subtotal.toFixed(2)}</p>
-      <p><b>Tax:</b> $${invoice.tax.toFixed(2)}</p>
-      <p><b>Total:</b> $${invoice.total.toFixed(2)}</p>
-      <h3>Line Items</h3>
-      <ul>`;
-    for (const item of invoice.items) {
-      html += `<li>${item.name}: ${item.qty} × $${item.rate.toFixed(2)} = $${(item.qty * item.rate).toFixed(2)}</li>`;
+  const togglePaid = async () => {
+    let updatedInvoice;
+    if (!invoice.paid) {
+      // Marking as paid: save current status and set to Completed
+      updatedInvoice = { 
+        ...invoice, 
+        paid: true, 
+        previousStatus: invoice.status,
+        status: 'Completed' 
+      };
+    } else {
+      // Unmarking as paid: restore previous status
+      updatedInvoice = { 
+        ...invoice, 
+        paid: false, 
+        status: invoice.previousStatus || 'Not Accepted' 
+      };
     }
-    html += `</ul>`;
+    setInvoice(updatedInvoice);
+
+    try {
+      const key = "@jobsite_invoices";
+      const data = await AsyncStorage.getItem(key);
+      let invoices = [];
+      if (data) invoices = JSON.parse(data);
+      const idx = invoices.findIndex((inv: any) => inv.id === invoice.id);
+      if (idx !== -1) {
+        invoices[idx] = updatedInvoice;
+        await AsyncStorage.setItem(key, JSON.stringify(invoices));
+      }
+    } catch {}
+  };
+
+  const handlePrint = async () => {
+    let html = `
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h2 { color: #333; border-bottom: 2px solid #007AFF; padding-bottom: 10px; }
+          h3 { color: #444; margin-top: 20px; }
+          .info { margin: 5px 0; }
+          .info b { color: #555; }
+          ul { padding-left: 20px; }
+          li { margin: 8px 0; }
+          .photos { margin-top: 20px; }
+          .photos img { width: 150px; height: 150px; object-fit: cover; margin: 5px; border-radius: 8px; border: 1px solid #ddd; }
+          .signature { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; }
+          .signature img { max-width: 300px; height: auto; }
+          .totals { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-top: 20px; }
+          .total-row { display: flex; justify-content: space-between; margin: 5px 0; }
+          .final-total { font-size: 1.2em; font-weight: bold; color: #007AFF; border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <h2>Invoice #${invoice.id}</h2>
+        <p class="info"><b>Date:</b> ${invoice.createdAt}</p>
+        <p class="info"><b>Status:</b> ${invoice.status}</p>
+        <p class="info"><b>Payment:</b> ${invoice.paid ? 'Paid' : 'Unpaid'}</p>
+        
+        <h3>Line Items</h3>
+        <ul>`;
+    
+    for (const item of invoice.items) {
+      html += `<li><b>${item.name}</b>: ${item.qty} × $${item.rate.toFixed(2)} = <b>$${(item.qty * item.rate).toFixed(2)}</b></li>`;
+    }
+    
+    html += `</ul>
+        
+        <div class="totals">
+          <div class="total-row"><span>Subtotal:</span> <span>$${invoice.subtotal.toFixed(2)}</span></div>
+          <div class="total-row"><span>Tax (${invoice.taxRate}%):</span> <span>$${invoice.tax.toFixed(2)}</span></div>
+          <div class="total-row final-total"><span>Total:</span> <span>$${invoice.total.toFixed(2)}</span></div>
+        </div>`;
+    
+    // Add photos if any
+    if (invoice.photos && invoice.photos.length > 0) {
+      html += `<div class="photos"><h3>Photos</h3>`;
+      for (const photo of invoice.photos) {
+        html += `<img src="${photo}" />`;
+      }
+      html += `</div>`;
+    }
+    
+    // Add signature if exists
+    if (invoice.signature) {
+      html += `
+        <div class="signature">
+          <h3>Signature</h3>
+          <img src="${invoice.signature}" />
+        </div>`;
+    }
+    
+    html += `</body></html>`;
+    
     await Print.printAsync({ html });
   };
 
@@ -72,10 +153,26 @@ export default function InvoiceViewScreen({ route, navigation }: any) {
       <View style={styles.statusRow}>
         <Text style={styles.label}>Status: </Text>
         <TouchableOpacity
-          style={[styles.statusButton, invoice.status === 'Accepted' ? styles.accepted : styles.notAccepted]}
-          onPress={toggleStatus}>
+          style={[styles.statusButton, 
+            invoice.status === 'Completed' ? styles.completed : 
+            invoice.status === 'Accepted' ? styles.accepted : styles.notAccepted
+          ]}
+          onPress={toggleStatus}
+          disabled={invoice.paid}>
           <Text style={styles.statusButtonText}>{invoice.status}</Text>
         </TouchableOpacity>
+      </View>
+      <View style={styles.paidRow}>
+        <Text style={styles.label}>Paid: </Text>
+        <Switch
+          value={invoice.paid || false}
+          onValueChange={togglePaid}
+          trackColor={{ false: '#ccc', true: '#34C759' }}
+          thumbColor={invoice.paid ? '#fff' : '#f4f3f4'}
+        />
+        <Text style={[styles.paidLabel, invoice.paid ? styles.paidYes : styles.paidNo]}>
+          {invoice.paid ? 'Yes' : 'No'}
+        </Text>
       </View>
       <Text style={styles.label}>Tax Rate: <Text style={styles.value}>{invoice.taxRate}%</Text></Text>
       <Text style={styles.label}>Subtotal: <Text style={styles.value}>${invoice.subtotal.toFixed(2)}</Text></Text>
@@ -141,6 +238,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  paidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  paidLabel: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  paidYes: {
+    color: '#34C759',
+  },
+  paidNo: {
+    color: '#8E8E93',
+  },
   statusButton: {
     paddingVertical: 4,
     paddingHorizontal: 14,
@@ -151,7 +264,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
   },
   notAccepted: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#FF9500',
+  },
+  completed: {
+    backgroundColor: '#007AFF',
   },
   statusButtonText: {
     color: 'white',
